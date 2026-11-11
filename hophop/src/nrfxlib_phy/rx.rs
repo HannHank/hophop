@@ -92,6 +92,8 @@ impl PccData {
 pub enum PccError {
     CrcError,
     UnexpectedEventDetails,
+    /// The PCC passed its CRC, but the modem considers the header invalid and receives no PDC.
+    InvalidHeader,
 }
 
 // For error propagation out of an .as_ref() result
@@ -181,6 +183,17 @@ impl RecvResultBuilder {
                 c?;
                 return Ok(core::ops::ControlFlow::Break(()));
             }
+            (_, event @ (DectEvent::Pcc(_) | DectEvent::PccError(_))) => {
+                defmt::warn!(
+                    "Sequence violation: PCC before the previous packet completed → dropping that packet"
+                );
+                *self = Waiting;
+                return self.feed(event);
+            }
+            (_, DectEvent::Pdc(_) | DectEvent::PdcError) => {
+                defmt::warn!("Sequence violation: PDC without a PCC → dropping it");
+            }
+
             _ => panic!("Sequence violation"),
         }
         Ok(core::ops::ControlFlow::Continue(()))
@@ -237,6 +250,11 @@ pub(super) unsafe fn event_pcc(pcc: *const dect_phy::pcc_event) -> DectEvent {
         header
     );
 
+    if pcc.header_status == dect_phy::hdr_status_values::INVALID {
+        return DectEvent::PccError(PccError::InvalidHeader);
+    }
+
+    // No PDC event follows an invalid header, so the PCC must not wait for one.
     DectEvent::Pcc(Pcc {
         time: pcc.stf_start_time,
         rssi_2: pcc.rssi_2,
