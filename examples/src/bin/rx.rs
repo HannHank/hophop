@@ -79,6 +79,11 @@ async fn main() {
             if let Ok(received) = received {
                 let start = received.pcc.time;
                 let pcc = received.pcc();
+                info!(
+                    "RSSI-2 {} dBm, SNR {} dB",
+                    received.pcc.rssi_dbm(),
+                    received.pcc.snr_db()
+                );
                 match received.pdc() {
                     Ok(pdc) => {
                         info!("Received at {}: {:?} {:?}", start, pcc, pdc);

@@ -37,7 +37,21 @@ pub(super) fn init() {
 #[derive(Debug, defmt::Format, Copy, Clone)]
 pub struct Pcc {
     pub time: u64,
+    /// RSSI-2 in 0.5 dBm steps
+    pub rssi_2: i16,
+    /// SNR in 0.25 dB
+    pub snr: i16,
     pub data: PccData,
+}
+
+impl Pcc {
+    pub fn rssi_dbm(&self) -> f32 {
+        f32::from(self.rssi_2) / 2.0
+    }
+
+    pub fn snr_db(&self) -> f32 {
+        f32::from(self.snr) / 4.0
+    }
 }
 
 #[derive(Debug, defmt::Format, Copy, Clone)]
@@ -225,6 +239,8 @@ pub(super) unsafe fn event_pcc(pcc: *const dect_phy::pcc_event) -> DectEvent {
 
     DectEvent::Pcc(Pcc {
         time: pcc.stf_start_time,
+        rssi_2: pcc.rssi_2,
+        snr: pcc.snr,
         data: header,
     })
 }
